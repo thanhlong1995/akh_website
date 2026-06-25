@@ -7,7 +7,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+# SUPABASE_URL ưu tiên hơn DATABASE_URL (Railway có thể override DATABASE_URL)
+DATABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("DATABASE_URL")
 
 
 @contextmanager
