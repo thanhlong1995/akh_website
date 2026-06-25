@@ -10,7 +10,12 @@ load_dotenv()
 app = FastAPI(title="AKH Quán API", version="1.0.0")
 
 # CORS — cho phép Vercel frontend và local dev server
-_raw_origins = os.getenv("CORS_ORIGINS", "http://localhost:5500,http://127.0.0.1:5500")
+_default_origins = (
+    "https://akhwebsites.vercel.app,"
+    "http://localhost:5500,"
+    "http://127.0.0.1:5500"
+)
+_raw_origins = os.getenv("CORS_ORIGINS", _default_origins)
 origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
 
 app.add_middleware(
