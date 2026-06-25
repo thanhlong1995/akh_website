@@ -52,4 +52,8 @@ async def auth_middleware(request: Request, call_next):
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "SUPABASE_URL": bool(os.getenv("SUPABASE_URL")),
+        "DATABASE_URL": bool(os.getenv("DATABASE_URL")),
+    }
