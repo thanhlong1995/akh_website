@@ -1,3 +1,4 @@
+import hmac
 import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
@@ -39,7 +40,7 @@ async def auth_middleware(request: Request, call_next):
     if request.url.path in _PUBLIC or request.method == "OPTIONS":
         return await call_next(request)
     token = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
-    if token != SESSION_TOKEN:
+    if not hmac.compare_digest(token, SESSION_TOKEN):
         return JSONResponse(status_code=401, content={"detail": "Chưa đăng nhập"})
     return await call_next(request)
 
