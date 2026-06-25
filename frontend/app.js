@@ -1,5 +1,4 @@
-// Đổi thành Railway URL khi deploy
-const API_BASE = 'http://localhost:8000';
+const API_BASE = 'https://akhwebsite-production.up.railway.app';
 
 // ── Utilities ──────────────────────────────────────────────────────────────
 
