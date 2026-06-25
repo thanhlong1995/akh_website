@@ -12,12 +12,9 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 @contextmanager
 def get_conn():
-    # Thêm sslmode=require nếu chưa có (Supabase bắt buộc SSL)
-    url = DATABASE_URL or ""
-    if "sslmode" not in url:
-        sep = "&" if "?" in url else "?"
-        url = f"{url}{sep}sslmode=require"
-    conn = psycopg2.connect(url, cursor_factory=RealDictCursor)
+    # Truyền sslmode=require qua kwargs (Supabase bắt buộc SSL)
+    ssl = {} if "sslmode" in (DATABASE_URL or "") else {"sslmode": "require"}
+    conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor, **ssl)
     try:
         yield conn
         conn.commit()
