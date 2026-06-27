@@ -155,10 +155,23 @@ CREATE TABLE order_items (
 ### Giai đoạn 7 — Deploy
 | # | Hạng mục | Trạng thái |
 |---|---|---|
-| 7.1 | Deploy backend lên Railway (set env vars `DATABASE_URL`, `SUPABASE_KEY`, `CORS_ORIGINS`) — `backend/railway.toml` đã có | ⬜ |
-| 7.2 | Cập nhật `API_BASE_URL` trong `app.js` trỏ về Railway URL | ⬜ |
-| 7.3 | Deploy frontend lên Vercel (kéo thư mục `frontend/`) — `frontend/vercel.json` đã có | ⬜ |
-| 7.4 | Smoke test toàn bộ 4 trang trên production URL | ⬜ |
+| 7.1 | Deploy backend lên Railway — thêm `railway.toml` ở root, kết nối GitHub repo để auto-deploy | ✅ |
+| 7.2 | Cập nhật `API_BASE` trong `app.js` → `https://akhwebsite-production.up.railway.app` | ✅ |
+| 7.3 | Deploy frontend lên Vercel → `https://akhwebsites.vercel.app` (Root Directory = `frontend`) | ✅ |
+| 7.4 | Smoke test toàn bộ 4 trang trên production URL | 🔄 |
+
+**Vấn đề còn tồn đọng (7.4):**
+- Railway chưa nhận `SUPABASE_URL` env var → backend không kết nối được Supabase
+- **Việc cần làm:** Vào Railway → Variables → thêm `SUPABASE_URL` = connection string Supabase (lấy từ Supabase → Project Settings → Database → Connection string → URI)
+- Sau khi set xong, Railway tự redeploy và 7.4 có thể tiến hành
+
+**Các fix đã thực hiện trong quá trình deploy:**
+- Thêm `railway.toml` ở root (Railpack không tìm được file trong `backend/`)
+- Bỏ pin version cứng `==` trong `requirements.txt` → dùng `>=`
+- Hardcode Vercel URL vào CORS default (Railway chưa nhận env var kịp)
+- Fix psycopg2 SSL: truyền `sslmode='require'` qua kwargs thay vì nhúng vào URL string
+- Đọc `SUPABASE_URL` trước `DATABASE_URL` để tránh Railway override
+- Thêm debug vào `/health` endpoint để kiểm tra env var status
 
 ---
 
@@ -178,12 +191,7 @@ CREATE TABLE order_items (
 
 ## Bước tiếp theo
 
-**Bắt đầu từ Giai đoạn 1**, theo thứ tự:
-
-1. Tạo cấu trúc thư mục và `requirements.txt`
-2. Tạo project Supabase và chạy SQL khởi tạo bảng (mục 2.1–2.6)
-3. Viết FastAPI app cơ bản và kết nối database
-4. Hoàn thành từng nhóm API endpoint, test qua `/docs`
-5. Xây frontend từ layout chung → từng trang → tích hợp API
-
-> **Ưu tiên:** Backend API phải hoàn chỉnh và test được trước khi bắt đầu tích hợp frontend.
+1. Vào Railway → Variables → thêm `SUPABASE_URL` = connection string Supabase
+2. Chờ Railway redeploy → kiểm tra `https://akhwebsite-production.up.railway.app/health` trả về `"SUPABASE_URL": true`
+3. Smoke test 4 trang trên `https://akhwebsites.vercel.app`
+4. Sau khi smoke test xong, xoá debug fields khỏi `/health` endpoint
