@@ -52,8 +52,20 @@ async def auth_middleware(request: Request, call_next):
 
 @app.get("/health")
 def health():
+    db_ok = False
+    db_error = None
+    try:
+        from database import get_conn
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+        db_ok = True
+    except Exception as e:
+        db_error = str(e)
     return {
         "status": "ok",
         "SUPABASE_URL": bool(os.getenv("SUPABASE_URL")),
         "DATABASE_URL": bool(os.getenv("DATABASE_URL")),
+        "db_connected": db_ok,
+        "db_error": db_error,
     }
