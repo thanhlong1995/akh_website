@@ -103,3 +103,21 @@ class MonthlyReport(BaseModel):
     total_orders: int
     avg_order_value: float
     chart: list[MonthlyPoint]   # 12 phần tử, T1–T12
+
+
+# ─── Order Detail (dùng cho in hóa đơn) ─────────────────────────────────────
+
+class OrderItemDetail(BaseModel):
+    product_name: str
+    quantity: float
+    unit_price: float
+    subtotal: float
+
+
+class OrderDetail(BaseModel):
+    id: int
+    customer_name: Optional[str]
+    total_amount: float
+    status: Literal["xu_ly", "dang_giao", "da_giao", "huy"]
+    created_at: datetime
+    items: list[OrderItemDetail]

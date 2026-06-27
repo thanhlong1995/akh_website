@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from database import get_conn
-from models import Order, OrderCreate, OrderSummary
+from models import Order, OrderCreate, OrderSummary, OrderDetail, OrderItemDetail
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -17,6 +17,46 @@ def recent_orders():
                 LIMIT 10
             """)
             return cur.fetchall()
+
+
+@router.get("/{order_id}", response_model=OrderDetail)
+def get_order(order_id: int):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT
+                    o.id, o.total_amount, o.status, o.created_at,
+                    c.name AS customer_name,
+                    p.name AS product_name,
+                    oi.quantity, oi.unit_price,
+                    (oi.quantity * oi.unit_price) AS subtotal
+                FROM orders o
+                LEFT JOIN customers c ON o.customer_id = c.id
+                JOIN order_items oi ON oi.order_id = o.id
+                JOIN products p ON p.id = oi.product_id
+                WHERE o.id = %s
+                ORDER BY oi.id
+            """, (order_id,))
+            rows = cur.fetchall()
+            if not rows:
+                raise HTTPException(404, "Không tìm thấy đơn hàng")
+            first = rows[0]
+            return OrderDetail(
+                id=first["id"],
+                customer_name=first["customer_name"],
+                total_amount=float(first["total_amount"]),
+                status=first["status"],
+                created_at=first["created_at"],
+                items=[
+                    OrderItemDetail(
+                        product_name=row["product_name"],
+                        quantity=float(row["quantity"]),
+                        unit_price=float(row["unit_price"]),
+                        subtotal=float(row["subtotal"]),
+                    )
+                    for row in rows
+                ]
+            )
 
 
 @router.get("", response_model=list[OrderSummary])
