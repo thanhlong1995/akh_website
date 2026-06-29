@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from database import get_conn
-from models import Order, OrderCreate, OrderSummary, OrderDetail, OrderItemDetail
+from models import Order, OrderCreate, OrderSummary, OrderDetail, OrderItemDetail, OrderStatusUpdate
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -23,30 +23,36 @@ def recent_orders():
 def get_order(order_id: int):
     with get_conn() as conn:
         with conn.cursor() as cur:
+            # Query 1: header đơn hàng
             cur.execute("""
-                SELECT
-                    o.id, o.total_amount, o.status, o.created_at,
-                    c.name AS customer_name,
-                    p.name AS product_name,
-                    oi.quantity, oi.unit_price,
-                    (oi.quantity * oi.unit_price) AS subtotal
+                SELECT o.id, o.total_amount, o.status, o.created_at,
+                       c.name AS customer_name
                 FROM orders o
                 LEFT JOIN customers c ON o.customer_id = c.id
-                JOIN order_items oi ON oi.order_id = o.id
-                JOIN products p ON p.id = oi.product_id
                 WHERE o.id = %s
+            """, (order_id,))
+            order = cur.fetchone()
+            if not order:
+                raise HTTPException(404, "Không tìm thấy đơn hàng")
+
+            # Query 2: danh sách món (có thể rỗng)
+            cur.execute("""
+                SELECT p.name AS product_name,
+                       oi.quantity, oi.unit_price,
+                       (oi.quantity * oi.unit_price) AS subtotal
+                FROM order_items oi
+                JOIN products p ON p.id = oi.product_id
+                WHERE oi.order_id = %s
                 ORDER BY oi.id
             """, (order_id,))
-            rows = cur.fetchall()
-            if not rows:
-                raise HTTPException(404, "Không tìm thấy đơn hàng")
-            first = rows[0]
+            items = cur.fetchall()
+
             return OrderDetail(
-                id=first["id"],
-                customer_name=first["customer_name"],
-                total_amount=float(first["total_amount"]),
-                status=first["status"],
-                created_at=first["created_at"],
+                id=order["id"],
+                customer_name=order["customer_name"],
+                total_amount=float(order["total_amount"]),
+                status=order["status"],
+                created_at=order["created_at"],
                 items=[
                     OrderItemDetail(
                         product_name=row["product_name"],
@@ -54,9 +60,22 @@ def get_order(order_id: int):
                         unit_price=float(row["unit_price"]),
                         subtotal=float(row["subtotal"]),
                     )
-                    for row in rows
+                    for row in items
                 ]
             )
+
+
+@router.put("/{order_id}")
+def update_order_status(order_id: int, body: OrderStatusUpdate):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE orders SET status = %s WHERE id = %s RETURNING id",
+                (body.status, order_id),
+            )
+            if not cur.fetchone():
+                raise HTTPException(404, "Không tìm thấy đơn hàng")
+    return {"ok": True}
 
 
 @router.get("", response_model=list[OrderSummary])

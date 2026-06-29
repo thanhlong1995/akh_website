@@ -48,6 +48,10 @@ class OrderCreate(BaseModel):
     items: list[OrderItemCreate]
 
 
+class OrderStatusUpdate(BaseModel):
+    status: Literal["xu_ly", "dang_giao", "da_giao", "huy"]
+
+
 class OrderItem(BaseModel):
     id: int
     product_id: int

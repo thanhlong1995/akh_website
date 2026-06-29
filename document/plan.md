@@ -4,7 +4,7 @@
 
 ## Mục tiêu
 
-Xây dựng web quản lý bán hàng (admin dashboard) cho cửa hàng ăn uống AKH Quán với 4 chức năng chính: Tổng quan, Tạo đơn hàng, Quản lý sản phẩm, và Báo cáo doanh thu.
+Xây dựng web quản lý bán hàng (admin dashboard) cho cửa hàng ăn uống AKH Quán với 6 chức năng chính: Tổng quan, Quản lý bàn (tạo đơn theo bàn), Đơn hàng (lịch sử + đổi trạng thái), Quản lý sản phẩm, và Báo cáo doanh thu.
 
 ---
 
@@ -115,7 +115,8 @@ CREATE TABLE order_items (
 | 3.2 | `PUT /products/{id}` + `DELETE /products/{id}` | `routes/products.py` | ✅ |
 | 3.3 | `GET /customers` + `POST /customers` | `routes/customers.py` | ✅ |
 | 3.4 | `POST /orders` (tạo đơn + items trong 1 transaction) | `routes/orders.py` | ✅ |
-| 3.5 | `GET /orders` + `GET /orders/recent` | `routes/orders.py` | ✅ |
+| 3.5 | `GET /orders` + `GET /orders/recent` + `GET /orders/{id}` | `routes/orders.py` | ✅ |
+| 3.10 | `PUT /orders/{id}` — đổi trạng thái đơn hàng | `routes/orders.py` | ✅ |
 | 3.6 | `GET /dashboard/stats` (4 chỉ số + delta hôm qua) | `routes/dashboard.py` | ✅ |
 | 3.7 | `GET /dashboard/revenue-chart` (7 ngày gần nhất) | `routes/dashboard.py` | ✅ |
 | 3.8 | `GET /report/monthly` (12 tháng, tổng đơn, TB đơn) | `routes/report.py` | ✅ |
@@ -135,10 +136,11 @@ CREATE TABLE order_items (
 ### Giai đoạn 5 — Frontend: Từng trang
 | # | Hạng mục | Trạng thái |
 |---|---|---|
-| 5.1 | **Trang 1 — Tổng quan**: 4 metric cards (với delta), biểu đồ 7 ngày (canvas/SVG), bảng đơn gần đây + badge trạng thái | ✅ |
-| 5.2 | **Trang 2 — Tạo đơn hàng**: ô nhập khách (tuỳ chọn), search sản phẩm, danh sách món đã thêm, tính tổng tự động, nút Tạo đơn | ✅ |
-| 5.3 | **Trang 3 — Sản phẩm**: bảng (tên, danh mục, đơn vị, giá), search + lọc danh mục, form thêm/sửa inline | ✅ |
-| 5.4 | **Trang 4 — Báo cáo**: 3 metric cards tháng, biểu đồ 12 cột (T1–T12) | ✅ |
+| 5.1 | **Trang 1 — Tổng quan**: 4 metric cards (với delta), biểu đồ 7 ngày (SVG), bảng đơn gần đây + badge trạng thái | ✅ |
+| 5.2 | **Trang 2 — Quản lý bàn** *(trước đây là "Tạo đơn hàng")*: lưới bàn 3/hàng, thêm bàn tự tăng số, click bàn mở form đơn hàng per-bàn, lưu state vào localStorage | ✅ |
+| 5.3 | **Trang 3 — Đơn hàng**: danh sách tất cả đơn, expand row xem chi tiết món, select đổi trạng thái inline (optimistic update) | ✅ |
+| 5.4 | **Trang 4 — Sản phẩm**: bảng (tên, danh mục, đơn vị, giá), search + lọc danh mục, form thêm/sửa inline | ✅ |
+| 5.5 | **Trang 5 — Báo cáo**: 3 metric cards tháng, biểu đồ 12 cột (T1–T12) | ✅ |
 
 ---
 
@@ -158,12 +160,7 @@ CREATE TABLE order_items (
 | 7.1 | Deploy backend lên Railway — thêm `railway.toml` ở root, kết nối GitHub repo để auto-deploy | ✅ |
 | 7.2 | Cập nhật `API_BASE` trong `app.js` → `https://akhwebsite-production.up.railway.app` | ✅ |
 | 7.3 | Deploy frontend lên Vercel → `https://akhwebsites.vercel.app` (Root Directory = `frontend`) | ✅ |
-| 7.4 | Smoke test toàn bộ 4 trang trên production URL | 🔄 |
-
-**Vấn đề còn tồn đọng (7.4):**
-- Railway chưa nhận `SUPABASE_URL` env var → backend không kết nối được Supabase
-- **Việc cần làm:** Vào Railway → Variables → thêm `SUPABASE_URL` = connection string Supabase (lấy từ Supabase → Project Settings → Database → Connection string → URI)
-- Sau khi set xong, Railway tự redeploy và 7.4 có thể tiến hành
+| 7.4 | Smoke test toàn bộ 4 trang trên production URL | ✅ |
 
 **Các fix đã thực hiện trong quá trình deploy:**
 - Thêm `railway.toml` ở root (Railpack không tìm được file trong `backend/`)
@@ -171,7 +168,35 @@ CREATE TABLE order_items (
 - Hardcode Vercel URL vào CORS default (Railway chưa nhận env var kịp)
 - Fix psycopg2 SSL: truyền `sslmode='require'` qua kwargs thay vì nhúng vào URL string
 - Đọc `SUPABASE_URL` trước `DATABASE_URL` để tránh Railway override
-- Thêm debug vào `/health` endpoint để kiểm tra env var status
+- Fix IPv6: chuyển sang Supabase Transaction Mode Pooler (port 6543, IPv4) thay vì direct connection (port 5432, IPv6 — Railway không reach được)
+- Xóa `db_error` khỏi `/health` endpoint (bảo mật — không lộ stack trace ra public)
+
+---
+
+### Giai đoạn 8 — Tính năng In Hóa Đơn Nhiệt (Xprinter)
+
+> Spec: `docs/superpowers/specs/2026-06-27-in-hoa-don-design.md`
+> Plan: `docs/superpowers/plans/2026-06-27-in-hoa-don.md`
+
+| # | Hạng mục | File | Trạng thái |
+|---|---|---|---|
+| 8.1 | `GET /orders/{id}` → `OrderDetail` (join orders + order_items + products + customers) | `backend/models.py`, `backend/routes/orders.py` | ✅ |
+| 8.2 | `printOrder()` in phiếu đặt món từ form bàn — mở popup window, in thermal receipt layout | `frontend/app.js` | ✅ |
+| 8.3 | Thêm thông tin liên hệ `ĐT: 0961279291` vào phiếu in | `frontend/app.js` | ✅ |
+
+---
+
+### Giai đoạn 9 — Quản lý bàn & Đơn hàng CRUD
+
+| # | Hạng mục | File | Trạng thái |
+|---|---|---|---|
+| 9.1 | Chuyển "Tạo đơn hàng" → "Quản lý bàn": lưới 3 bàn/hàng, bàn tự tăng số (Bàn 1, 2, …N) | `frontend/app.js`, `frontend/index.html`, `frontend/style.css` | ✅ |
+| 9.2 | State per-bàn: mỗi bàn có danh sách món riêng, lưu vào `localStorage` (key `akh_tables_v1`, `akh_table_items_v1`) | `frontend/app.js` | ✅ |
+| 9.3 | Form đơn hàng per-bàn: tìm món, tăng/giảm số lượng, tạo đơn, in phiếu, xoá bàn | `frontend/app.js` | ✅ |
+| 9.4 | `OrderStatusUpdate` Pydantic model + `PUT /orders/{id}` endpoint | `backend/models.py`, `backend/routes/orders.py` | ✅ |
+| 9.5 | Trang "Đơn hàng" (`#history`): bảng tất cả đơn, expand row xem chi tiết, select đổi trạng thái inline | `frontend/app.js`, `frontend/index.html`, `frontend/style.css` | ✅ |
+| 9.6 | Sidebar cập nhật: 5 mục (Tổng quan, Bàn, Đơn hàng, Sản phẩm, Báo cáo) | `frontend/index.html` | ✅ |
+| 9.7 | `business.md` cập nhật spec module 2 & 3 | `document/business.md` | ✅ |
 
 ---
 
@@ -185,13 +210,17 @@ CREATE TABLE order_items (
 | D4 | Status đơn hàng mặc định khi tạo là `xu_ly` | Phù hợp luồng vận hành thực tế của quán |
 | D5 | Không dùng JS framework | Ràng buộc từ spec — giữ đơn giản, không cần build pipeline |
 | D6 | Biểu đồ dựng bằng Canvas API hoặc SVG thuần | Không dùng thư viện chart bên ngoài để tránh dependency |
-| D7 | Router hash-based (`#dashboard`, `#orders`, ...) | SPA đơn giản không cần server-side routing |
+| D7 | Router hash-based (`#dashboard`, `#orders`, `#history`, ...) | SPA đơn giản không cần server-side routing |
+| D8 | State bàn lưu localStorage, không lưu DB | Bàn là khái niệm vận hành tạm thời — không cần persist server; reset sau khi tạo đơn là đủ |
+| D9 | Order detail lazy-load + cache trong `orderDetailCache` | Tránh fetch tất cả items khi render danh sách; cache tránh re-fetch khi toggle expand |
+| D10 | Đổi trạng thái dùng optimistic update | UI phản hồi tức thì, rollback nếu API lỗi — UX tốt hơn so với chờ server confirm |
+| D11 | `PUT /orders/{id}` chỉ update status, không update items | Items đã snapshot giá tại thời điểm tạo (D2) — không nên sửa sau khi tạo |
 
 ---
 
 ## Bước tiếp theo
 
-1. Vào Railway → Variables → thêm `SUPABASE_URL` = connection string Supabase
-2. Chờ Railway redeploy → kiểm tra `https://akhwebsite-production.up.railway.app/health` trả về `"SUPABASE_URL": true`
-3. Smoke test 4 trang trên `https://akhwebsites.vercel.app`
-4. Sau khi smoke test xong, xoá debug fields khỏi `/health` endpoint
+1. Deploy lên Railway + Vercel để cập nhật production với các tính năng Stage 9
+2. Smoke test trang **Bàn**: thêm bàn → thêm món → tạo đơn → in phiếu
+3. Smoke test trang **Đơn hàng**: xem danh sách → expand chi tiết → đổi trạng thái
+4. Xem xét thêm tính năng lọc/tìm kiếm đơn hàng theo ngày hoặc trạng thái nếu cần
